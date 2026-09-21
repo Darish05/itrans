@@ -33,21 +33,23 @@ export class WebSpeechSTTProvider implements STTProvider {
     try {
       const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
       this.recognition = new SpeechRecognitionClass();
-      this.recognition.continuous = false;
+      this.recognition.continuous = true;
       this.recognition.interimResults = true;
       this.recognition.lang = language;
 
       this.startTime = performance.now();
 
       this.recognition.onresult = (event: any) => {
-        const lastResult = event.results[event.results.length - 1];
-        const text = lastResult[0].transcript;
-        const confidence = lastResult[0].confidence || 0.95;
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          fullTranscript += event.results[i][0].transcript;
+        }
+        const confidence = event.results[event.results.length - 1]?.[0]?.confidence || 0.95;
         const durationMs = Math.round(performance.now() - this.startTime);
         const processingTimeMs = Math.round(durationMs * 0.15 + 60);
 
         onResult({
-          text,
+          text: fullTranscript,
           confidence,
           language,
           durationMs,
