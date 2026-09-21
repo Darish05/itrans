@@ -1,0 +1,102 @@
+import { LanguageConfig } from '../models/types';
+
+export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
+  {
+    code: 'ta-IN',
+    displayName: 'Tamil',
+    nativeName: 'தமிழ்',
+    sttSupport: true,
+    ttsSupport: true,
+    sampleText: 'வணக்கம், இது அவசர தகவல்.',
+  },
+  {
+    code: 'hi-IN',
+    displayName: 'Hindi',
+    nativeName: 'हिन्दी',
+    sttSupport: true,
+    ttsSupport: true,
+    sampleText: 'आपातकालीन सहायता आवश्यक है।',
+  },
+  {
+    code: 'en-IN',
+    displayName: 'English',
+    nativeName: 'English (India)',
+    sttSupport: true,
+    ttsSupport: true,
+    sampleText: 'Emergency assistance required immediately.',
+  },
+  {
+    code: 'te-IN',
+    displayName: 'Telugu',
+    nativeName: 'తెలుగు',
+    sttSupport: true,
+    ttsSupport: true,
+    sampleText: 'అత్యవసర సహాయం అవసరం.',
+  },
+  {
+    code: 'kn-IN',
+    displayName: 'Kannada',
+    nativeName: 'ಕನ್ನಡ',
+    sttSupport: true,
+    ttsSupport: true,
+    sampleText: 'ತುರ್ತು ನೆರವು ಅಗತ್ಯವಿದೆ.',
+  },
+  {
+    code: 'ml-IN',
+    displayName: 'Malayalam',
+    nativeName: 'മലയാളം',
+    sttSupport: true,
+    ttsSupport: true,
+    sampleText: 'അടിയന്തര സഹായം ആവശ്യമാണ്.',
+  },
+  {
+    code: 'mr-IN',
+    displayName: 'Marathi',
+    nativeName: 'मराठी',
+    sttSupport: true,
+    ttsSupport: true,
+    sampleText: 'तातडीची मदत आवश्यक आहे.',
+  },
+  {
+    code: 'gu-IN',
+    displayName: 'Gujarati',
+    nativeName: 'ગુજરાતી',
+    sttSupport: true,
+    ttsSupport: true,
+    sampleText: 'તાકીદની સહાયની જરૂર છે.',
+  },
+  {
+    code: 'bn-IN',
+    displayName: 'Bengali',
+    nativeName: 'বাংলা',
+    sttSupport: true,
+    ttsSupport: true,
+    sampleText: 'জরুরী সহায়তা প্রয়োজন।',
+  },
+  {
+    code: 'or-IN',
+    displayName: 'Odia',
+    nativeName: 'ଓଡ଼ିଆ',
+    sttSupport: true,
+    ttsSupport: true,
+    sampleText: 'ଜରୁରୀ ସହାୟତା ଆବଶ୍ୟକ।',
+  },
+];
+
+export const SYSTEM_CONFIG = {
+  sihProblemStatement: '26173',
+  projectTitle: 'iTantra',
+  projectSubtitle: 'Indian Multilingual TTS & STT Aided Neural Transceiver Radio Access for Low Bitrate',
+  defaultSilenceThresholdMs: 1200,
+  defaultLanguageCode: 'ta-IN',
+  providers: {
+    activeSTT: 'web_speech',
+    activeTTS: 'web_speech',
+    activeTransport: 'broadcast_channel',
+  },
+  targetProductionArchitecture: {
+    stt: 'Offline IndicConformer / Whisper open-source STT',
+    tts: 'Offline Piper / Coqui open-source TTS',
+    transport: 'Low-power Wi-Fi P2P & Bluetooth LE Mesh transceiver',
+  },
+};
