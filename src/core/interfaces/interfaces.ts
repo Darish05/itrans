@@ -14,6 +14,14 @@ export interface AudioResult {
   processingTimeMs: number;
 }
 
+export interface TranslationResult {
+  originalText: string;
+  translatedText: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  latencyMs: number;
+}
+
 export interface STTProvider {
   id: string;
   name: string;
@@ -32,6 +40,13 @@ export interface TTSProvider {
   synthesize(text: string, language: string): Promise<AudioResult>;
   speak(text: string, language: string, onStart?: () => void, onEnd?: () => void): Promise<AudioResult>;
   stop(): void;
+}
+
+export interface TranslationProvider {
+  id: string;
+  name: string;
+  isOfflineCapable: boolean;
+  translate(text: string, sourceLang: string, targetLang: string): Promise<TranslationResult>;
 }
 
 export interface TransportProvider {

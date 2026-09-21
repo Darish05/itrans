@@ -25,6 +25,8 @@ import {
   Server,
   Sparkles,
   Share2,
+  Globe,
+  Languages,
 } from 'lucide-react';
 
 import { SUPPORTED_LANGUAGES, SYSTEM_CONFIG } from '../core/config/config';
@@ -34,6 +36,7 @@ import { GoogleSTTProvider, LocalIndicConformerSTTProvider } from '../providers/
 import { WebSpeechTTSProvider } from '../providers/tts/WebSpeechTTSProvider';
 import { MicrosoftTTSProvider, LocalPiperTTSProvider } from '../providers/tts/CloudAndLocalTTSProviders';
 import { BroadcastTransportProvider } from '../providers/transport/BroadcastTransportProvider';
+import { IndicTranslationProvider } from '../providers/translation/IndicTranslationProvider';
 import { AudioQueueService } from '../services/audio/AudioQueueService';
 import { VoiceActivityDetectorService } from '../services/vad/VoiceActivityDetectorService';
 
@@ -41,7 +44,10 @@ export function ITantraDashboard() {
   // Provider Selection
   const [sttProviderType, setSttProviderType] = useState<'web_speech' | 'google' | 'local_indic_conformer'>('web_speech');
   const [ttsProviderType, setTtsProviderType] = useState<'web_speech' | 'microsoft' | 'local_piper'>('web_speech');
-  const [selectedLang, setSelectedLang] = useState(SUPPORTED_LANGUAGES[0]); // Tamil ta-IN default
+  
+  // Independent Phone Languages for Cross-Language Transceiver Demo
+  const [phoneALang, setPhoneALang] = useState(SUPPORTED_LANGUAGES[0]); // Tamil ta-IN default
+  const [phoneBLang, setPhoneBLang] = useState(SUPPORTED_LANGUAGES[1]); // Hindi hi-IN default (Cross-language demo!)
 
   // Session & Connection
   const [sessionId, setSessionId] = useState('sih-26173-demo');
@@ -54,20 +60,22 @@ export function ITantraDashboard() {
   const [isPhoneAProcessingSTT, setIsPhoneAProcessingSTT] = useState(false);
   const [isPhoneATransmitting, setIsPhoneATransmitting] = useState(false);
   const [phoneARecognizedText, setPhoneARecognizedText] = useState(SUPPORTED_LANGUAGES[0].sampleText);
-  const [phoneAStatusText, setPhoneAStatusText] = useState('Idle (Press PTT to speak)');
-  const [silenceThresholdMs, setSilenceThresholdMs] = useState(1200);
+  const [phoneAStatusText, setPhoneAStatusText] = useState('Idle (Press PTT to speak in Tamil)');
 
   // Phone B (TTS / Receiver) State
   const [isPhoneBReceiving, setIsPhoneBReceiving] = useState(false);
+  const [isPhoneBTranslating, setIsPhoneBTranslating] = useState(false);
   const [isPhoneBProcessingTTS, setIsPhoneBProcessingTTS] = useState(false);
   const [isPhoneBPlayingAudio, setIsPhoneBPlayingAudio] = useState(false);
-  const [phoneBReceivedText, setPhoneBReceivedText] = useState('');
+  const [phoneBOriginalText, setPhoneBOriginalText] = useState('');
+  const [phoneBTranslatedText, setPhoneBTranslatedText] = useState('');
   const [phoneBStatusText, setPhoneBStatusText] = useState('Standby (Waiting for incoming packet)');
   const [isAlertActive, setIsAlertActive] = useState(false);
 
   // Latency & Metrics State
   const [sttLatencyMs, setSttLatencyMs] = useState(82);
   const [txLatencyMs, setTxLatencyMs] = useState(31);
+  const [nmtLatencyMs, setNmtLatencyMs] = useState(35);
   const [ttsLatencyMs, setTtsLatencyMs] = useState(146);
   const [realTimeFactor, setRealTimeFactor] = useState(0.21);
   const [audioDurationSec, setAudioDurationSec] = useState(2.4);
@@ -82,35 +90,33 @@ export function ITantraDashboard() {
     {
       id: 'log-1',
       timestamp: new Date().toLocaleTimeString(),
-      message: 'iTantra Neural Transceiver System Initialized',
+      message: 'iTantra Neural Transceiver Multilingual Engine Initialized',
       type: 'system',
     },
     {
       id: 'log-2',
       timestamp: new Date().toLocaleTimeString(),
-      message: 'Local Wi-Fi P2P Session connected: sih-26173-demo',
+      message: 'Cross-Language Mode Active: Phone A (Tamil) -> Phone B (Hindi)',
       type: 'network',
     },
   ]);
 
-  // Active Provider Instances
+  // Provider Instances
   const sttProviderRef = useRef<any>(new WebSpeechSTTProvider());
   const ttsProviderRef = useRef<any>(new WebSpeechTTSProvider());
+  const translationProviderRef = useRef(new IndicTranslationProvider());
   const transportRef = useRef(new BroadcastTransportProvider());
   const audioQueueRef = useRef(new AudioQueueService(ttsProviderRef.current));
-  const vadRef = useRef(new VoiceActivityDetectorService());
 
   // Waveform animation
   const [waveAnim, setWaveAnim] = useState(false);
 
   // Initialize Providers & Transport
   useEffect(() => {
-    // Update STT Provider
     if (sttProviderType === 'web_speech') sttProviderRef.current = new WebSpeechSTTProvider();
     else if (sttProviderType === 'google') sttProviderRef.current = new GoogleSTTProvider();
     else sttProviderRef.current = new LocalIndicConformerSTTProvider();
 
-    // Update TTS Provider
     if (ttsProviderType === 'web_speech') ttsProviderRef.current = new WebSpeechTTSProvider();
     else if (ttsProviderType === 'microsoft') ttsProviderRef.current = new MicrosoftTTSProvider();
     else ttsProviderRef.current = new LocalPiperTTSProvider();
@@ -133,11 +139,11 @@ export function ITantraDashboard() {
     };
   }, [sessionId]);
 
-  // Update sample text on language change
+  // Update sample text when Phone A language changes
   useEffect(() => {
-    setPhoneARecognizedText(selectedLang.sampleText);
-    addLog(`Language switched to ${selectedLang.displayName} (${selectedLang.nativeName})`, 'system');
-  }, [selectedLang]);
+    setPhoneARecognizedText(phoneALang.sampleText);
+    addLog(`Phone A Language set to ${phoneALang.displayName} (${phoneALang.nativeName})`, 'system', 'PHONE_A');
+  }, [phoneALang]);
 
   const addLog = (message: string, type: LogEntry['type'], deviceId?: 'PHONE_A' | 'PHONE_B') => {
     const entry: LogEntry = {
@@ -150,24 +156,22 @@ export function ITantraDashboard() {
     setLogs((prev) => [entry, ...prev.slice(0, 49)]);
   };
 
-  // Process Speech-to-Text & Transmission Workflow
+  // Transmit Speech Workflow from Phone A
   const handleTransmitSpeech = async (customText?: string, isEmergencyAlert = false) => {
     if (isPhoneAListening || isPhoneAProcessingSTT || isPhoneATransmitting) return;
 
-    const speechStartTime = performance.now();
     setIsPhoneAListening(true);
     setWaveAnim(true);
-    setPhoneAStatusText('Listening for speech...');
-    addLog('Speech input started (Mic active)', 'stt', 'PHONE_A');
+    setPhoneAStatusText(`Listening in ${phoneALang.displayName}...`);
+    addLog(`Microphone active on Phone A (${phoneALang.displayName})`, 'stt', 'PHONE_A');
 
-    // 1. Simulate Speech Duration / Silence Boundary Detection
+    // 1. Simulate Speech Recording / Pause Boundary Detection
     setTimeout(async () => {
       setIsPhoneAListening(false);
       setIsPhoneAProcessingSTT(true);
       setPhoneAStatusText('Processing STT (Speech-to-Text)...');
-      addLog('Pause detected: Finalizing sentence boundary', 'stt', 'PHONE_A');
+      addLog('Sentence boundary finalized via VAD', 'stt', 'PHONE_A');
 
-      const speechEnd = performance.now();
       const textToTranscribe = customText || phoneARecognizedText;
 
       // 2. Execute STT Provider
@@ -177,7 +181,7 @@ export function ITantraDashboard() {
       if (sttProviderType === 'web_speech' && sttProviderRef.current.isSupported() && !customText) {
         try {
           sttProviderRef.current.startListening(
-            selectedLang.code,
+            phoneALang.code,
             (res: any) => {
               if (res.text) {
                 sttResultText = res.text;
@@ -186,9 +190,7 @@ export function ITantraDashboard() {
             },
             (err: string) => console.warn(err)
           );
-        } catch (e) {
-          // fallback to preset
-        }
+        } catch (e) {}
       }
 
       await new Promise((r) => setTimeout(r, isEmergencyAlert ? 40 : 120));
@@ -197,16 +199,16 @@ export function ITantraDashboard() {
       setSttLatencyMs(calculatedSttLatency);
       setIsPhoneAProcessingSTT(false);
 
-      addLog(`STT completed in ${calculatedSttLatency} ms: "${sttResultText}"`, 'stt', 'PHONE_A');
+      addLog(`STT (${phoneALang.displayName}) completed in ${calculatedSttLatency} ms: "${sttResultText}"`, 'stt', 'PHONE_A');
 
       // 3. Create Compact Text Packet
       setIsPhoneATransmitting(true);
-      setPhoneAStatusText('Creating & Transmitting Text Packet...');
+      setPhoneAStatusText('Transmitting 42B Text Packet...');
 
       const packet: TextPacket = {
         id: `pkt-${Date.now()}`,
         senderId: 'PHONE_A',
-        language: selectedLang.code,
+        language: phoneALang.code,
         text: sttResultText,
         timestamp: Date.now(),
         type: isEmergencyAlert ? 'alert' : 'speech',
@@ -218,36 +220,56 @@ export function ITantraDashboard() {
       const txLatency = await transportRef.current.send(packet);
       setTxLatencyMs(txLatency);
       setLastPacketSizeBytes(packet.payloadSizeBytes);
-      addLog(`Text Packet sent (${packet.payloadSizeBytes} bytes) via Wi-Fi P2P in ${txLatency} ms`, 'network', 'PHONE_A');
+      addLog(`Text Packet sent (${packet.payloadSizeBytes} bytes) in ${txLatency} ms over Wi-Fi P2P`, 'network', 'PHONE_A');
 
       setIsPhoneATransmitting(false);
       setWaveAnim(false);
       setPhoneAStatusText('Idle (Transmission Complete)');
 
-      // Also trigger Phone B locally in dual-simulation mode
-      handleIncomingTextPacket(packet, speechEnd);
+      // Process on Phone B locally in dual-simulation mode
+      handleIncomingTextPacket(packet);
     }, 1200);
   };
 
-  // Process Incoming Text Packet on Phone B (Receiver / TTS)
-  const handleIncomingTextPacket = async (packet: TextPacket, speechEndTimestamp?: number) => {
+  // Receive and Translate Text Packet on Phone B (Receiver / Cross-Language TTS)
+  const handleIncomingTextPacket = async (packet: TextPacket) => {
     setIsPhoneBReceiving(true);
-    setPhoneBReceivedText(packet.text);
+    setPhoneBOriginalText(packet.text);
     setPhoneBStatusText('Text packet received');
-    addLog(`Received text packet (${packet.payloadSizeBytes} bytes) from ${packet.senderId}`, 'network', 'PHONE_B');
+    addLog(`Received text packet (${packet.payloadSizeBytes} bytes) from Phone A`, 'network', 'PHONE_B');
 
     if (packet.priority === 'critical' || packet.type === 'alert') {
       setIsAlertActive(true);
-      addLog('🚨 CRITICAL EMERGENCY ALERT DISPATCHED', 'alert', 'PHONE_B');
+      addLog('🚨 CRITICAL EMERGENCY ALERT RECEIVED', 'alert', 'PHONE_B');
     }
 
-    // 1. Synthesize TTS
+    // 1. Cross-Language Neural Machine Translation
     setIsPhoneBReceiving(false);
+    setIsPhoneBTranslating(true);
+    setPhoneBStatusText(`Translating from ${phoneALang.displayName} -> ${phoneBLang.displayName}...`);
+
+    const translationResult = await translationProviderRef.current.translate(
+      packet.text,
+      packet.language,
+      phoneBLang.code
+    );
+
+    setNmtLatencyMs(translationResult.latencyMs);
+    setPhoneBTranslatedText(translationResult.translatedText);
+    setIsPhoneBTranslating(false);
+
+    addLog(
+      `NMT Translation (${phoneALang.displayName} ➔ ${phoneBLang.displayName}) completed in ${translationResult.latencyMs} ms: "${translationResult.translatedText}"`,
+      'system',
+      'PHONE_B'
+    );
+
+    // 2. Synthesize & Speak TTS in Phone B's Language
     setIsPhoneBProcessingTTS(true);
-    setPhoneBStatusText('Synthesizing Text-to-Speech audio...');
+    setPhoneBStatusText(`Synthesizing TTS Audio in ${phoneBLang.displayName}...`);
 
     const ttsStart = performance.now();
-    const synthResult = await ttsProviderRef.current.synthesize(packet.text, packet.language);
+    const synthResult = await ttsProviderRef.current.synthesize(translationResult.translatedText, phoneBLang.code);
     const ttsEnd = performance.now();
     const calculatedTtsLatency = Math.round(ttsEnd - ttsStart);
     setTtsLatencyMs(calculatedTtsLatency);
@@ -257,23 +279,28 @@ export function ITantraDashboard() {
     setAudioDurationSec(Number((synthResult.audioDurationMs / 1000).toFixed(1)));
     setIsPhoneBProcessingTTS(false);
 
-    addLog(`TTS Synthesized in ${calculatedTtsLatency} ms (RTF: ${calcRtf}x)`, 'tts', 'PHONE_B');
+    addLog(`TTS Synthesized (${phoneBLang.displayName}) in ${calculatedTtsLatency} ms (RTF: ${calcRtf}x)`, 'tts', 'PHONE_B');
 
-    // 2. Play Audio via Speaker
+    // 3. Play Audio via Speaker
     setIsPhoneBPlayingAudio(true);
-    setPhoneBStatusText('▶ Playing audio through speaker');
-    addLog('Audio playback started', 'audio', 'PHONE_B');
+    setPhoneBStatusText(`▶ Playing audio in ${phoneBLang.displayName}`);
+    addLog(`Playing audio output on Phone B in ${phoneBLang.displayName}`, 'audio', 'PHONE_B');
 
-    // Enqueue audio in priority queue
+    // Enqueue in priority queue
+    const translatedPacket: TextPacket = {
+      ...packet,
+      language: phoneBLang.code,
+      text: translationResult.translatedText,
+    };
+
     audioQueueRef.current.enqueue(
-      packet,
+      translatedPacket,
       () => {},
       () => {
         setIsPhoneBPlayingAudio(false);
         setPhoneBStatusText('Standby (Playback complete)');
-        addLog('Audio playback finished', 'audio', 'PHONE_B');
+        addLog('Audio playback finished on Phone B', 'audio', 'PHONE_B');
 
-        // Update random simulated CPU/RAM values slightly
         setPhoneACpu(Math.floor(15 + Math.random() * 8));
         setPhoneBCpu(Math.floor(18 + Math.random() * 10));
       }
@@ -292,17 +319,19 @@ export function ITantraDashboard() {
     setIsPhoneAProcessingSTT(false);
     setIsPhoneATransmitting(false);
     setIsPhoneBReceiving(false);
+    setIsPhoneBTranslating(false);
     setIsPhoneBProcessingTTS(false);
     setIsPhoneBPlayingAudio(false);
     setIsAlertActive(false);
-    setPhoneBReceivedText('');
+    setPhoneBOriginalText('');
+    setPhoneBTranslatedText('');
     setPhoneAStatusText('Idle (Press PTT to speak)');
     setPhoneBStatusText('Standby (Waiting for incoming packet)');
     setWaveAnim(false);
-    addLog('System Reset: Cleared buffers and queues', 'system');
+    addLog('System Reset: Cleared buffers and translation queues', 'system');
   };
 
-  const endToEndLatencyMs = sttLatencyMs + txLatencyMs + ttsLatencyMs;
+  const endToEndLatencyMs = sttLatencyMs + txLatencyMs + nmtLatencyMs + ttsLatencyMs;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950">
@@ -358,7 +387,7 @@ export function ITantraDashboard() {
               className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === 'simulator' ? 'bg-cyan-500 text-slate-950 font-semibold shadow-md shadow-cyan-500/20' : 'text-slate-400 hover:text-slate-200'}`}
             >
               <Smartphone className="w-4 h-4" />
-              <span>Transceiver Simulator</span>
+              <span>Multilingual Transceiver Console</span>
             </button>
             <button
               onClick={() => setActiveTab('pair_device')}
@@ -389,31 +418,12 @@ export function ITantraDashboard() {
               <span>Event Logs ({logs.length})</span>
             </button>
           </div>
-
-          {/* Language Chip Selector */}
-          <div className="flex items-center space-x-2 overflow-x-auto py-1 max-w-full">
-            <span className="text-xs text-slate-400 font-mono">Language:</span>
-            <select
-              value={selectedLang.code}
-              onChange={(e) => {
-                const lang = SUPPORTED_LANGUAGES.find((l) => l.code === e.target.value);
-                if (lang) setSelectedLang(lang);
-              }}
-              className="bg-slate-900 text-cyan-300 border border-slate-700 text-xs rounded-lg px-3 py-1.5 font-medium focus:outline-none focus:ring-1 focus:ring-cyan-500"
-            >
-              {SUPPORTED_LANGUAGES.map((lang) => (
-                <option key={lang.code} value={lang.code}>
-                  {lang.displayName} ({lang.nativeName})
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
       </nav>
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-8">
-        {/* Provider Interface Configuration Banner */}
+        {/* Replaceable Provider Configuration Banner */}
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
           <div className="flex items-center space-x-3">
             <div className="p-2 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800/60">
@@ -421,13 +431,13 @@ export function ITantraDashboard() {
             </div>
             <div>
               <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                Replaceable Provider Adapters
+                Replaceable STT / NMT / TTS Providers
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60">
                   Decoupled Architecture
                 </span>
               </h3>
               <p className="text-xs text-slate-400">
-                Core UI & Transport logic is decoupled from STT/TTS cloud providers. Easily swap cloud APIs for offline models.
+                Transmits 42-byte text packets over P2P Wi-Fi/Bluetooth. Decoupled AI adapters for cloud & offline Indic models.
               </p>
             </div>
           </div>
@@ -466,7 +476,7 @@ export function ITantraDashboard() {
         {/* TAB 1: Transceiver Simulator Screen */}
         {activeTab === 'simulator' && (
           <div className="space-y-8">
-            {/* Top Walkie-Talkie vs Phone Mode Switcher Bar */}
+            {/* Communication Mode & Quick Actions Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 p-4 rounded-2xl">
               <div className="flex items-center space-x-3">
                 <span className="text-xs font-mono text-slate-400">Communication Mode:</span>
@@ -494,7 +504,7 @@ export function ITantraDashboard() {
                   className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all active:scale-95 disabled:opacity-50"
                 >
                   <Play className="w-4 h-4 fill-current" />
-                  <span>Start Demo Sequence</span>
+                  <span>Start Transceiver Sequence</span>
                 </button>
                 <button
                   onClick={resetDemo}
@@ -512,7 +522,7 @@ export function ITantraDashboard() {
               <div className="lg:col-span-5 bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-slate-800 hover:border-cyan-500/40 rounded-3xl p-5 shadow-2xl space-y-5 relative overflow-hidden transition-all group">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl group-hover:bg-cyan-500/10 transition-all pointer-events-none" />
 
-                {/* Phone Notch & Status Bar */}
+                {/* Status Bar */}
                 <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 border-b border-slate-800/80 pb-2">
                   <span>iTantra • Phone A</span>
                   <div className="w-16 h-3.5 bg-slate-900 border border-slate-800 rounded-full flex items-center justify-center">
@@ -521,18 +531,39 @@ export function ITantraDashboard() {
                   <span>9:41 AM • 98%</span>
                 </div>
 
-                {/* Phone Header */}
-                <div className="flex items-center justify-between">
-                  <div>
+                {/* Phone Header & Language Selection */}
+                <div className="flex flex-col space-y-2">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
                       <h3 className="font-bold text-slate-100 text-base">PHONE A (TRANSMITTER)</h3>
                     </div>
-                    <p className="text-xs text-cyan-400 font-mono mt-0.5">STT Focused Device</p>
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold bg-cyan-950 text-cyan-400 border border-cyan-800/60">
+                      STT TRANSMITTER
+                    </span>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-cyan-950 text-cyan-400 border border-cyan-800/60">
-                    ROLE: STT TRANSMITTER
-                  </span>
+
+                  {/* Phone A Language Selector */}
+                  <div className="flex items-center justify-between bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl">
+                    <span className="text-xs text-slate-400 font-mono flex items-center gap-1.5">
+                      <Languages className="w-3.5 h-3.5 text-cyan-400" />
+                      Speak Language:
+                    </span>
+                    <select
+                      value={phoneALang.code}
+                      onChange={(e) => {
+                        const lang = SUPPORTED_LANGUAGES.find((l) => l.code === e.target.value);
+                        if (lang) setPhoneALang(lang);
+                      }}
+                      className="bg-slate-900 text-cyan-300 font-bold text-xs rounded-lg px-2.5 py-1 border border-slate-700"
+                    >
+                      {SUPPORTED_LANGUAGES.map((lang) => (
+                        <option key={lang.code} value={lang.code}>
+                          {lang.displayName} ({lang.nativeName})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Voice Status & Waveform Display */}
@@ -564,15 +595,15 @@ export function ITantraDashboard() {
                     }`}
                   >
                     <Mic className="w-5 h-5" />
-                    <span>{isPhoneAListening ? 'LISTENING... (RELEASE TO SEND)' : 'PUSH TO TALK (PTT)'}</span>
+                    <span>{isPhoneAListening ? 'LISTENING... (RELEASE TO SEND)' : `PUSH TO TALK (${phoneALang.displayName})`}</span>
                   </button>
                 </div>
 
                 {/* Recognized Text Display */}
                 <div className="space-y-2">
                   <label className="text-xs font-mono text-slate-400 flex items-center justify-between">
-                    <span>Recognized Text ({selectedLang.displayName}):</span>
-                    <span className="text-cyan-400 font-bold">{selectedLang.nativeName}</span>
+                    <span>Recognized Text ({phoneALang.displayName}):</span>
+                    <span className="text-cyan-400 font-bold">{phoneALang.nativeName}</span>
                   </label>
                   <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 text-sm font-medium text-slate-200 min-h-[70px] flex items-center">
                     "{phoneARecognizedText}"
@@ -609,17 +640,15 @@ export function ITantraDashboard() {
 
                 {/* Flow Diagram Line & Packet Animation */}
                 <div className="w-full h-32 lg:h-48 relative flex items-center justify-center">
-                  {/* Connecting Line */}
                   <div className="w-1 h-full lg:w-full lg:h-1 bg-gradient-to-r from-cyan-500/40 via-blue-500 to-emerald-500/40 rounded-full" />
 
-                  {/* Animated Text Packet Moving across line */}
                   <div
                     className={`absolute p-2.5 rounded-xl bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/40 transition-all duration-1000 flex items-center space-x-1.5 text-xs font-mono font-bold ${
                       isPhoneATransmitting ? 'scale-110 opacity-100 animate-bounce' : 'opacity-80 scale-90'
                     }`}
                   >
                     <FileText className="w-4 h-4" />
-                    <span>TEXT</span>
+                    <span>42B TEXT</span>
                   </div>
                 </div>
 
@@ -630,13 +659,13 @@ export function ITantraDashboard() {
                 </div>
               </div>
 
-              {/* PHONE B: TTS / RECEIVER */}
+              {/* PHONE B: TTS / RECEIVER & CROSS-LANGUAGE TRANSLATOR */}
               <div className={`lg:col-span-5 bg-gradient-to-b from-slate-900 to-slate-950 border-2 rounded-3xl p-5 shadow-2xl space-y-5 relative overflow-hidden transition-all group ${
                 isAlertActive ? 'border-rose-500 shadow-rose-500/20' : 'border-slate-800 hover:border-emerald-500/40'
               }`}>
                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl group-hover:bg-emerald-500/10 transition-all pointer-events-none" />
 
-                {/* Phone Notch & Status Bar */}
+                {/* Status Bar */}
                 <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 border-b border-slate-800/80 pb-2">
                   <span>iTantra • Phone B</span>
                   <div className="w-16 h-3.5 bg-slate-900 border border-slate-800 rounded-full flex items-center justify-center">
@@ -645,18 +674,39 @@ export function ITantraDashboard() {
                   <span>9:41 AM • 95%</span>
                 </div>
 
-                {/* Phone Header */}
-                <div className="flex items-center justify-between">
-                  <div>
+                {/* Phone Header & Language Selection */}
+                <div className="flex flex-col space-y-2">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <span className={`w-2.5 h-2.5 rounded-full ${isAlertActive ? 'bg-rose-500 animate-bounce' : 'bg-emerald-400 animate-pulse'}`} />
                       <h3 className="font-bold text-slate-100 text-base">PHONE B (RECEIVER)</h3>
                     </div>
-                    <p className="text-xs text-emerald-400 font-mono mt-0.5">TTS Focused Device</p>
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800/60">
+                      TTS & TRANSLATOR
+                    </span>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800/60">
-                    ROLE: TTS RECEIVER
-                  </span>
+
+                  {/* Phone B Target Language Selector */}
+                  <div className="flex items-center justify-between bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl">
+                    <span className="text-xs text-slate-400 font-mono flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                      Hear Language:
+                    </span>
+                    <select
+                      value={phoneBLang.code}
+                      onChange={(e) => {
+                        const lang = SUPPORTED_LANGUAGES.find((l) => l.code === e.target.value);
+                        if (lang) setPhoneBLang(lang);
+                      }}
+                      className="bg-slate-900 text-emerald-300 font-bold text-xs rounded-lg px-2.5 py-1 border border-slate-700"
+                    >
+                      {SUPPORTED_LANGUAGES.map((lang) => (
+                        <option key={lang.code} value={lang.code}>
+                          {lang.displayName} ({lang.nativeName})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Emergency Alert Mode Banner if Active */}
@@ -698,57 +748,75 @@ export function ITantraDashboard() {
                       : 'bg-slate-900 text-slate-400 border-slate-800'
                   }`}>
                     {isPhoneBPlayingAudio ? <Volume2 className="w-5 h-5 animate-bounce" /> : <VolumeX className="w-5 h-5" />}
-                    <span>{isPhoneBPlayingAudio ? 'PLAYING TTS AUDIO OUTPUT...' : 'AUDIO SPEAKER STANDBY'}</span>
+                    <span>{isPhoneBPlayingAudio ? `PLAYING ${phoneBLang.displayName.toUpperCase()} TTS AUDIO...` : 'AUDIO SPEAKER STANDBY'}</span>
                   </div>
                 </div>
 
-                {/* Received Text Box */}
-                <div className="space-y-2">
-                  <label className="text-xs font-mono text-slate-400">Incoming Transmitted Text:</label>
-                  <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 text-sm font-medium text-slate-200 min-h-[70px] flex items-center">
-                    {phoneBReceivedText ? `"${phoneBReceivedText}"` : <span className="text-slate-500 italic">No incoming packet received yet</span>}
+                {/* Cross-Language Translation Output Display */}
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-mono text-slate-400 flex items-center justify-between">
+                      <span>Original Received Text ({phoneALang.displayName}):</span>
+                    </label>
+                    <div className="bg-slate-900/80 border border-slate-800/80 rounded-xl p-2.5 text-xs font-mono text-slate-400 min-h-[45px] flex items-center">
+                      {phoneBOriginalText ? `"${phoneBOriginalText}"` : <span className="italic text-slate-600">Waiting for packet...</span>}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-mono text-emerald-400 font-semibold flex items-center justify-between">
+                      <span>Translated Text ({phoneBLang.displayName}):</span>
+                      <span>{phoneBLang.nativeName}</span>
+                    </label>
+                    <div className="bg-emerald-950/30 border border-emerald-800/50 rounded-xl p-3 text-sm font-semibold text-emerald-200 min-h-[55px] flex items-center">
+                      {phoneBTranslatedText ? `"${phoneBTranslatedText}"` : <span className="italic text-slate-500 font-normal">Translated text will appear here</span>}
+                    </div>
                   </div>
                 </div>
 
-                {/* TTS Latency & RTF Display */}
+                {/* TTS & Translation Latency Display */}
                 <div className="bg-emerald-950/40 border border-emerald-800/40 rounded-xl p-3 space-y-2 text-xs font-mono">
                   <div className="flex items-center justify-between text-emerald-300 font-semibold">
-                    <span>TTS SYNTHESIS METRICS</span>
+                    <span>NMT TRANSLATION & TTS METRICS</span>
                     <span className="bg-emerald-900/80 px-2 py-0.5 rounded text-emerald-200 border border-emerald-700">
                       RTF: {realTimeFactor}x
                     </span>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-300">
+                    <div>NMT Latency: <span className="text-emerald-400 font-bold">{nmtLatencyMs} ms</span></div>
                     <div>TTS Latency: <span className="text-emerald-400 font-bold">{ttsLatencyMs} ms</span></div>
                     <div>Audio Duration: <span className="text-emerald-400 font-bold">{audioDurationSec} s</span></div>
-                    <div>Quality: <span className="text-emerald-400 font-bold">HD Voice</span></div>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Bottom End-to-End Latency Metrics Summary Bar */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-center font-mono">
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 grid grid-cols-2 md:grid-cols-6 gap-3 text-center font-mono">
+              <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
                 <span className="text-[10px] text-slate-400 block uppercase">STT Latency</span>
-                <span className="text-lg font-bold text-cyan-400">{sttLatencyMs} ms</span>
+                <span className="text-base font-bold text-cyan-400">{sttLatencyMs} ms</span>
               </div>
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                <span className="text-[10px] text-slate-400 block uppercase">Wi-Fi Tx Latency</span>
-                <span className="text-lg font-bold text-sky-400">{txLatencyMs} ms</span>
+              <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-[10px] text-slate-400 block uppercase">Wi-Fi Tx</span>
+                <span className="text-base font-bold text-sky-400">{txLatencyMs} ms</span>
               </div>
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+              <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-[10px] text-slate-400 block uppercase">NMT Translation</span>
+                <span className="text-base font-bold text-teal-400">{nmtLatencyMs} ms</span>
+              </div>
+              <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
                 <span className="text-[10px] text-slate-400 block uppercase">TTS Latency</span>
-                <span className="text-lg font-bold text-emerald-400">{ttsLatencyMs} ms</span>
+                <span className="text-base font-bold text-emerald-400">{ttsLatencyMs} ms</span>
               </div>
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                <span className="text-[10px] text-slate-400 block uppercase">Real-Time Factor</span>
-                <span className="text-lg font-bold text-amber-400">{realTimeFactor}x</span>
+              <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-[10px] text-slate-400 block uppercase">RTF Factor</span>
+                <span className="text-base font-bold text-amber-400">{realTimeFactor}x</span>
               </div>
-              <div className="p-3 bg-cyan-950/80 rounded-xl border border-cyan-800/80 col-span-2 md:col-span-1">
+              <div className="p-2.5 bg-cyan-950/80 rounded-xl border border-cyan-800/80 col-span-2 md:col-span-1">
                 <span className="text-[10px] text-cyan-300 block uppercase font-bold">End-to-End Latency</span>
-                <span className="text-xl font-extrabold text-cyan-300">{endToEndLatencyMs} ms</span>
+                <span className="text-lg font-extrabold text-cyan-300">{endToEndLatencyMs} ms</span>
               </div>
             </div>
           </div>
@@ -764,7 +832,7 @@ export function ITantraDashboard() {
               <div>
                 <h2 className="text-lg font-bold text-slate-100">Local Network Multi-Device Pair Mode</h2>
                 <p className="text-xs text-slate-400">
-                  Open this application in two separate browser tabs or devices on the same Wi-Fi network to test real text-over-network communication.
+                  Open this application in two separate browser tabs or devices on the same Wi-Fi network to test real cross-language text-over-network communication.
                 </p>
               </div>
             </div>
@@ -862,7 +930,7 @@ export function ITantraDashboard() {
             {/* Benchmark Metrics Breakdown Table */}
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 space-y-4">
               <h3 className="font-bold text-slate-100 text-base font-mono flex items-center justify-between">
-                <span>Detailed Component Latency Breakdown</span>
+                <span>Detailed Multilingual Component Latency Breakdown</span>
                 <span className="text-xs text-slate-400 font-normal">SIMULATED / ESTIMATED METRICS</span>
               </h3>
 
@@ -870,7 +938,7 @@ export function ITantraDashboard() {
                 <table className="w-full text-left font-mono text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-slate-800 text-slate-400">
-                      <th className="py-2.5 px-3">Metric</th>
+                      <th className="py-2.5 px-3">Metric Component</th>
                       <th className="py-2.5 px-3">Measured Value</th>
                       <th className="py-2.5 px-3">Target Performance</th>
                       <th className="py-2.5 px-3">Status</th>
@@ -878,7 +946,7 @@ export function ITantraDashboard() {
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 text-slate-300">
                     <tr>
-                      <td className="py-3 px-3 font-semibold text-cyan-300">STT Latency</td>
+                      <td className="py-3 px-3 font-semibold text-cyan-300">STT Latency ({phoneALang.displayName})</td>
                       <td className="py-3 px-3">{sttLatencyMs} ms</td>
                       <td className="py-3 px-3 text-slate-400">&lt; 150 ms</td>
                       <td className="py-3 px-3 text-emerald-400">PASS</td>
@@ -890,7 +958,13 @@ export function ITantraDashboard() {
                       <td className="py-3 px-3 text-emerald-400">PASS</td>
                     </tr>
                     <tr>
-                      <td className="py-3 px-3 font-semibold text-emerald-300">TTS Latency</td>
+                      <td className="py-3 px-3 font-semibold text-teal-300">NMT Translation ({phoneALang.displayName} ➔ {phoneBLang.displayName})</td>
+                      <td className="py-3 px-3">{nmtLatencyMs} ms</td>
+                      <td className="py-3 px-3 text-slate-400">&lt; 60 ms</td>
+                      <td className="py-3 px-3 text-emerald-400">PASS</td>
+                    </tr>
+                    <tr>
+                      <td className="py-3 px-3 font-semibold text-emerald-300">TTS Latency ({phoneBLang.displayName})</td>
                       <td className="py-3 px-3">{ttsLatencyMs} ms</td>
                       <td className="py-3 px-3 text-slate-400">&lt; 200 ms</td>
                       <td className="py-3 px-3 text-emerald-400">PASS</td>
@@ -902,7 +976,7 @@ export function ITantraDashboard() {
                       <td className="py-3 px-3 text-emerald-400">PASS</td>
                     </tr>
                     <tr className="bg-cyan-950/30 font-bold">
-                      <td className="py-3 px-3 text-cyan-200">End-to-End Speech-to-Speech Latency</td>
+                      <td className="py-3 px-3 text-cyan-200">End-to-End Multilingual Speech-to-Speech Latency</td>
                       <td className="py-3 px-3 text-cyan-300">{endToEndLatencyMs} ms</td>
                       <td className="py-3 px-3 text-slate-400">&lt; 400 ms</td>
                       <td className="py-3 px-3 text-emerald-400">OPTIMAL</td>
@@ -947,7 +1021,7 @@ export function ITantraDashboard() {
                 <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-800/40 space-y-2">
                   <span className="text-emerald-400 font-bold block">✓ ITANTRA TEXT PACKET TRANSMISSION</span>
                   <p className="text-slate-400">
-                    Converts voice to text on Phone A, transmits lightweight JSON packet over P2P, synthesizes voice on Phone B.
+                    Converts voice to text on Phone A, transmits lightweight JSON packet over P2P, translates NMT & synthesizes voice on Phone B.
                   </p>
                   <div className="text-emerald-300 font-bold">Payload Size: ~42 Bytes (99.9% Savings!)</div>
                 </div>
@@ -963,6 +1037,7 @@ export function ITantraDashboard() {
                   <ul className="space-y-1 text-slate-300 list-disc list-inside">
                     <li>Google Cloud Speech-to-Text Adapter</li>
                     <li>Microsoft Azure Cognitive TTS Adapter</li>
+                    <li>IndicTrans2 NMT Translation Adapter</li>
                     <li>Browser Web Speech API (Native Fallback)</li>
                   </ul>
                 </div>
@@ -972,6 +1047,7 @@ export function ITantraDashboard() {
                   <ul className="space-y-1 text-slate-300 list-disc list-inside">
                     <li>Offline IndicConformer / Whisper Open-Source STT</li>
                     <li>Offline Piper / Coqui Open-Source Neural TTS</li>
+                    <li>Offline Bhashini / IndicTrans2 Local NMT Model</li>
                     <li>Direct Low-Power Wi-Fi P2P & BLE Mesh Sockets</li>
                   </ul>
                 </div>
