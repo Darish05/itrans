@@ -27,6 +27,11 @@ import {
   Share2,
   Globe,
   Languages,
+  MoreVertical,
+  ChevronLeft,
+  Send,
+  Battery,
+  Signal,
 } from 'lucide-react';
 
 import { SUPPORTED_LANGUAGES, SYSTEM_CONFIG } from '../core/config/config';
@@ -60,7 +65,7 @@ export function ITantraDashboard() {
   const [isPhoneAProcessingSTT, setIsPhoneAProcessingSTT] = useState(false);
   const [isPhoneATransmitting, setIsPhoneATransmitting] = useState(false);
   const [phoneARecognizedText, setPhoneARecognizedText] = useState('');
-  const [phoneAStatusText, setPhoneAStatusText] = useState('Idle (Press PTT to speak in Tamil)');
+  const [phoneAStatusText, setPhoneAStatusText] = useState('Ready • Press Microphone to Speak');
 
   // Phone B (TTS / Receiver) State
   const [isPhoneBReceiving, setIsPhoneBReceiving] = useState(false);
@@ -69,7 +74,7 @@ export function ITantraDashboard() {
   const [isPhoneBPlayingAudio, setIsPhoneBPlayingAudio] = useState(false);
   const [phoneBOriginalText, setPhoneBOriginalText] = useState('');
   const [phoneBTranslatedText, setPhoneBTranslatedText] = useState('');
-  const [phoneBStatusText, setPhoneBStatusText] = useState('Standby (Waiting for incoming packet)');
+  const [phoneBStatusText, setPhoneBStatusText] = useState('Standby • Listening on P2P');
   const [isAlertActive, setIsAlertActive] = useState(false);
 
   // Latency & Metrics State
@@ -168,7 +173,7 @@ export function ITantraDashboard() {
     setTimeout(async () => {
       setIsPhoneAListening(false);
       setIsPhoneAProcessingSTT(true);
-      setPhoneAStatusText('Processing STT (Speech-to-Text)...');
+      setPhoneAStatusText('STT Processing...');
       addLog('Sentence boundary finalized via VAD', 'stt', 'PHONE_A');
 
       const textToTranscribe = customText || phoneARecognizedText;
@@ -223,7 +228,7 @@ export function ITantraDashboard() {
 
       setIsPhoneATransmitting(false);
       setWaveAnim(false);
-      setPhoneAStatusText('Idle (Transmission Complete)');
+      setPhoneAStatusText('Ready • Press Microphone to Speak');
 
       // Process on Phone B locally in dual-simulation mode
       handleIncomingTextPacket(packet);
@@ -234,7 +239,7 @@ export function ITantraDashboard() {
   const handleIncomingTextPacket = async (packet: TextPacket) => {
     setIsPhoneBReceiving(true);
     setPhoneBOriginalText(packet.text);
-    setPhoneBStatusText('Text packet received');
+    setPhoneBStatusText('Text Packet Received');
     addLog(`Received text packet (${packet.payloadSizeBytes} bytes) from Phone A`, 'network', 'PHONE_B');
 
     if (packet.priority === 'critical' || packet.type === 'alert') {
@@ -245,7 +250,7 @@ export function ITantraDashboard() {
     // 1. Cross-Language Neural Machine Translation
     setIsPhoneBReceiving(false);
     setIsPhoneBTranslating(true);
-    setPhoneBStatusText(`Translating from ${phoneALang.displayName} -> ${phoneBLang.displayName}...`);
+    setPhoneBStatusText(`Translating ${phoneALang.displayName} ➔ ${phoneBLang.displayName}...`);
 
     const translationResult = await translationProviderRef.current.translate(
       packet.text,
@@ -265,7 +270,7 @@ export function ITantraDashboard() {
 
     // 2. Synthesize & Speak TTS in Phone B's Language
     setIsPhoneBProcessingTTS(true);
-    setPhoneBStatusText(`Synthesizing TTS Audio in ${phoneBLang.displayName}...`);
+    setPhoneBStatusText(`Synthesizing TTS in ${phoneBLang.displayName}...`);
 
     const ttsStart = performance.now();
     const synthResult = await ttsProviderRef.current.synthesize(translationResult.translatedText, phoneBLang.code);
@@ -282,7 +287,7 @@ export function ITantraDashboard() {
 
     // 3. Play Audio via Speaker
     setIsPhoneBPlayingAudio(true);
-    setPhoneBStatusText(`▶ Playing audio in ${phoneBLang.displayName}`);
+    setPhoneBStatusText(`▶ Playing Audio in ${phoneBLang.displayName}`);
     addLog(`Playing audio output on Phone B in ${phoneBLang.displayName}`, 'audio', 'PHONE_B');
 
     // Enqueue in priority queue
@@ -297,7 +302,7 @@ export function ITantraDashboard() {
       () => {},
       () => {
         setIsPhoneBPlayingAudio(false);
-        setPhoneBStatusText('Standby (Playback complete)');
+        setPhoneBStatusText('Standby • Listening on P2P');
         addLog('Audio playback finished on Phone B', 'audio', 'PHONE_B');
 
         setPhoneACpu(Math.floor(15 + Math.random() * 8));
@@ -324,8 +329,8 @@ export function ITantraDashboard() {
     setIsAlertActive(false);
     setPhoneBOriginalText('');
     setPhoneBTranslatedText('');
-    setPhoneAStatusText('Idle (Press PTT to speak)');
-    setPhoneBStatusText('Standby (Waiting for incoming packet)');
+    setPhoneAStatusText('Ready • Press Microphone to Speak');
+    setPhoneBStatusText('Standby • Listening on P2P');
     setWaveAnim(false);
     addLog('System Reset: Cleared buffers and translation queues', 'system');
   };
@@ -386,7 +391,7 @@ export function ITantraDashboard() {
               className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === 'simulator' ? 'bg-cyan-500 text-slate-950 font-semibold shadow-md shadow-cyan-500/20' : 'text-slate-400 hover:text-slate-200'}`}
             >
               <Smartphone className="w-4 h-4" />
-              <span>Multilingual Transceiver Console</span>
+              <span>Android Transceiver Console</span>
             </button>
             <button
               onClick={() => setActiveTab('pair_device')}
@@ -518,83 +523,91 @@ export function ITantraDashboard() {
             {/* Side-by-Side Smartphone Simulation Area */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
               
-              {/* PHONE A: REALISTIC ANDROID SMARTPHONE FRAME */}
+              {/* PHONE A: REALISTIC ANDROID SMARTPHONE HARDWARE CHASSIS */}
               <div className="lg:col-span-5 relative">
-                {/* Hardware Volume & Power Buttons */}
+                {/* External Hardware Buttons */}
                 <div className="absolute -left-[5px] top-24 w-[5px] h-12 bg-slate-700/80 rounded-l-md border-l border-slate-600 shadow-md" />
                 <div className="absolute -left-[5px] top-40 w-[5px] h-12 bg-slate-700/80 rounded-l-md border-l border-slate-600 shadow-md" />
                 <div className="absolute -right-[5px] top-28 w-[5px] h-14 bg-slate-700/80 rounded-r-md border-r border-slate-600 shadow-md" />
 
-                {/* Outer Phone Bezel & Metallic Chassis */}
-                <div className="bg-slate-900 rounded-[48px] p-3 border-4 border-slate-800 ring-1 ring-slate-700/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] relative overflow-hidden group">
+                {/* Outer Phone Bezel & Metallic Frame */}
+                <div className="bg-slate-900 rounded-[52px] p-3.5 border-4 border-slate-800 ring-1 ring-slate-700/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
                   {/* Inner Screen Surface */}
-                  <div className="bg-slate-950 rounded-[38px] p-4 space-y-4 border border-slate-800/80 min-h-[660px] flex flex-col justify-between">
-                    {/* Top Camera Punch Hole & Android Status Bar */}
+                  <div className="bg-slate-950 rounded-[40px] p-4 space-y-4 border border-slate-800/80 min-h-[670px] flex flex-col justify-between">
+                    {/* Top Punch Hole Camera & Android Status Bar */}
                     <div>
-                      <div className="flex items-center justify-center space-x-2 pb-1.5 border-b border-slate-900">
+                      <div className="flex items-center justify-center space-x-2 pb-1 border-b border-slate-900">
                         <div className="w-12 h-1 bg-slate-800 rounded-full" />
                         <div className="w-3.5 h-3.5 rounded-full bg-slate-950 border border-slate-700 ring-1 ring-cyan-500/30 flex items-center justify-center">
                           <div className="w-1.5 h-1.5 rounded-full bg-cyan-500/60" />
                         </div>
                       </div>
 
+                      {/* Android System Bar */}
                       <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-1.5 pb-2 border-b border-slate-800/60">
                         <span className="flex items-center gap-1 font-semibold text-cyan-400">
-                          <Smartphone className="w-3 h-3 text-cyan-400" />
-                          iTantra • Android A
+                          <Signal className="w-3 h-3 text-cyan-400" />
+                          iTantra 5G • Android A
                         </span>
-                        <span className="text-[10px] text-slate-400">9:41 AM • 5G 🔋 98%</span>
+                        <span className="flex items-center gap-1 text-[10px] text-slate-400">
+                          <span>9:41 AM</span>
+                          <Battery className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>98%</span>
+                        </span>
                       </div>
                     </div>
 
-                    {/* Main App Content on Android Screen */}
+                    {/* Android App Bar & UI Content */}
                     <div className="space-y-4 flex-1">
-                      {/* Phone Header & Language Selection */}
-                      <div className="flex flex-col space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
-                            <h3 className="font-bold text-slate-100 text-sm">PHONE A (TRANSMITTER)</h3>
+                      {/* Material App Bar */}
+                      <div className="flex items-center justify-between bg-slate-900/90 p-2.5 rounded-2xl border border-slate-800">
+                        <div className="flex items-center space-x-2">
+                          <ChevronLeft className="w-4 h-4 text-slate-400" />
+                          <div className="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+                            <Radio className="w-4 h-4" />
                           </div>
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold bg-cyan-950 text-cyan-400 border border-cyan-800/60">
-                            STT MODE
-                          </span>
+                          <div>
+                            <h3 className="font-bold text-slate-100 text-xs">iTantra Radio A</h3>
+                            <span className="text-[9px] text-cyan-400 font-mono block">STT Transmitter • Online</span>
+                          </div>
                         </div>
+                        <MoreVertical className="w-4 h-4 text-slate-400" />
+                      </div>
 
-                        {/* Phone A Language Selector */}
-                        <div className="flex items-center justify-between bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl">
-                          <span className="text-xs text-slate-400 font-mono flex items-center gap-1.5">
-                            <Languages className="w-3.5 h-3.5 text-cyan-400" />
-                            Speak Language:
-                          </span>
-                          <select
-                            value={phoneALang.code}
-                            onChange={(e) => {
-                              const lang = SUPPORTED_LANGUAGES.find((l) => l.code === e.target.value);
-                              if (lang) setPhoneALang(lang);
-                            }}
-                            className="bg-slate-950 text-cyan-300 font-bold text-xs rounded-lg px-2 py-1 border border-slate-700"
-                          >
-                            {SUPPORTED_LANGUAGES.map((lang) => (
-                              <option key={lang.code} value={lang.code}>
-                                {lang.displayName} ({lang.nativeName})
-                              </option>
-                            ))}
-                          </select>
+                      {/* Material Language Selection Chips */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-slate-400 uppercase flex items-center justify-between px-1">
+                          <span>Speak Language:</span>
+                          <span className="text-cyan-400 font-bold">{phoneALang.nativeName}</span>
+                        </label>
+                        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1">
+                          {SUPPORTED_LANGUAGES.map((lang) => (
+                            <button
+                              key={lang.code}
+                              onClick={() => setPhoneALang(lang)}
+                              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all ${
+                                phoneALang.code === lang.code
+                                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                              }`}
+                            >
+                              {lang.displayName}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
-                      {/* Voice Status & Waveform Display */}
-                      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 text-center space-y-3">
-                        <div className="text-xs font-mono text-slate-400">
-                          Status: <span className="text-cyan-400 font-semibold">{phoneAStatusText}</span>
+                      {/* Android Push-To-Talk Tactical Mic FAB Button */}
+                      <div className="bg-slate-900/80 border border-slate-800/80 rounded-3xl p-4 text-center space-y-3">
+                        <div className="text-[11px] font-mono text-slate-400">
+                          State: <span className="text-cyan-400 font-semibold">{phoneAStatusText}</span>
                         </div>
 
-                        {/* Waveform Visualizer */}
-                        <div className="h-12 bg-slate-950/90 rounded-xl border border-slate-800 flex items-center justify-center space-x-1 px-4 overflow-hidden">
-                          {[40, 75, 30, 90, 60, 100, 45, 80, 55, 95, 35, 70, 50, 85, 40].map((h, idx) => (
+                        {/* Speech Waveform Spectrum */}
+                        <div className="h-10 bg-slate-950/90 rounded-2xl border border-slate-800 flex items-center justify-center space-x-1 px-4 overflow-hidden">
+                          {[35, 75, 25, 90, 60, 100, 45, 80, 55, 95, 30, 70, 50, 85, 40].map((h, idx) => (
                             <div
                               key={idx}
                               className={`w-1 rounded-full bg-gradient-to-t from-cyan-500 to-blue-400 transition-all duration-150 ${waveAnim ? 'animate-pulse' : 'opacity-40'}`}
@@ -603,58 +616,67 @@ export function ITantraDashboard() {
                           ))}
                         </div>
 
-                        {/* Push To Talk Button */}
-                        <button
-                          onMouseDown={() => handleTransmitSpeech()}
-                          onTouchStart={() => handleTransmitSpeech()}
-                          disabled={isPhoneAListening || isPhoneAProcessingSTT}
-                          className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wide flex items-center justify-center space-x-3 transition-all shadow-xl active:scale-95 ${
-                            isPhoneAListening
-                              ? 'bg-rose-500 text-white shadow-rose-500/30 animate-pulse'
-                              : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-cyan-500/20'
-                          }`}
-                        >
-                          <Mic className="w-5 h-5" />
-                          <span>{isPhoneAListening ? 'LISTENING... (RELEASE TO SEND)' : `PUSH TO TALK (${phoneALang.displayName})`}</span>
-                        </button>
+                        {/* Tactical Mic FAB Circle */}
+                        <div className="flex justify-center py-1">
+                          <button
+                            onMouseDown={() => handleTransmitSpeech()}
+                            onTouchStart={() => handleTransmitSpeech()}
+                            disabled={isPhoneAListening || isPhoneAProcessingSTT}
+                            className={`w-24 h-24 rounded-full flex flex-col items-center justify-center space-y-1 transition-all shadow-2xl active:scale-95 cursor-pointer ring-4 ${
+                              isPhoneAListening
+                                ? 'bg-rose-500 text-white ring-rose-400/60 shadow-rose-500/40 animate-pulse'
+                                : 'bg-gradient-to-tr from-cyan-500 to-blue-600 text-slate-950 ring-cyan-400/40 shadow-cyan-500/30 hover:scale-105'
+                            }`}
+                          >
+                            <Mic className="w-8 h-8 fill-current" />
+                            <span className="text-[10px] font-bold uppercase tracking-tighter">
+                              {isPhoneAListening ? 'RECORDING' : 'HOLD PTT'}
+                            </span>
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Recognized Text Display */}
+                      {/* Android Outgoing Message Input Bubble */}
                       <div className="space-y-1.5">
-                        <label className="text-xs font-mono text-slate-400 flex items-center justify-between">
-                          <span>Recognized Text ({phoneALang.displayName}):</span>
-                          <span className="text-cyan-400 font-bold">{phoneALang.nativeName}</span>
-                        </label>
-                        <textarea
-                          value={phoneARecognizedText}
-                          onChange={(e) => setPhoneARecognizedText(e.target.value)}
-                          placeholder={`Type or speak anything in ${phoneALang.displayName}...`}
-                          className="w-full bg-slate-900/90 border border-slate-800 rounded-xl p-3 text-sm font-medium text-slate-200 min-h-[70px] focus:outline-none focus:ring-1 focus:ring-cyan-500 font-mono resize-none"
-                        />
+                        <label className="text-[11px] font-mono text-slate-400 px-1">Recognized Speech Input:</label>
+                        <div className="bg-cyan-950/40 border border-cyan-800/50 rounded-2xl rounded-tr-none p-3 space-y-2">
+                          <textarea
+                            value={phoneARecognizedText}
+                            onChange={(e) => setPhoneARecognizedText(e.target.value)}
+                            placeholder={`Type or hold microphone to speak in ${phoneALang.displayName}...`}
+                            className="w-full bg-transparent text-sm font-medium text-slate-100 placeholder-slate-500 focus:outline-none font-mono resize-none min-h-[55px]"
+                          />
+                          <div className="flex items-center justify-between text-[10px] font-mono text-cyan-400 pt-1 border-t border-cyan-900/60">
+                            <span>Language: {phoneALang.displayName}</span>
+                            <button
+                              onClick={() => handleTransmitSpeech()}
+                              className="flex items-center space-x-1 px-2.5 py-1 bg-cyan-500 text-slate-950 font-bold rounded-lg shadow-sm"
+                            >
+                              <Send className="w-3 h-3" />
+                              <span>SEND 42B</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Text Packet Payload Information */}
-                      <div className="bg-cyan-950/40 border border-cyan-800/40 rounded-xl p-3 space-y-2 text-xs font-mono">
-                        <div className="flex items-center justify-between text-cyan-300 font-semibold">
-                          <span className="flex items-center gap-1.5">
-                            <FileText className="w-3.5 h-3.5" />
-                            TEXT PACKET (SERIALIZED)
+                      {/* Android Packet Payload Card */}
+                      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 text-[11px] font-mono space-y-1">
+                        <div className="flex items-center justify-between text-cyan-300">
+                          <span className="flex items-center gap-1 font-semibold">
+                            <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                            PACKET PAYLOAD: {lastPacketSizeBytes} BYTES
                           </span>
-                          <span className="bg-cyan-900/80 px-2 py-0.5 rounded text-cyan-200 border border-cyan-700">
-                            {lastPacketSizeBytes} BYTES
-                          </span>
+                          <span className="text-emerald-400 font-bold">99.9% SAVED</span>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300">
-                          <div>Latency: <span className="text-cyan-400 font-bold">{txLatencyMs} ms</span></div>
-                          <div>Bandwidth Saved: <span className="text-emerald-400 font-bold">99.9% vs Raw Audio</span></div>
-                        </div>
+                        <div className="text-[10px] text-slate-400">Wi-Fi Tx Latency: {txLatencyMs} ms</div>
                       </div>
                     </div>
 
                     {/* Bottom Android Gesture Navigation Bar */}
-                    <div className="pt-2 border-t border-slate-900 flex flex-col items-center justify-center">
-                      <div className="w-32 h-1 bg-slate-600/80 rounded-full" />
+                    <div className="pt-2 border-t border-slate-900 flex justify-between items-center px-8 text-slate-600 text-xs">
+                      <span>◄</span>
+                      <span className="w-3 h-3 rounded-full border-2 border-slate-600" />
+                      <span>■</span>
                     </div>
                   </div>
                 </div>
@@ -690,95 +712,103 @@ export function ITantraDashboard() {
                 </div>
               </div>
 
-              {/* PHONE B: REALISTIC ANDROID SMARTPHONE FRAME */}
+              {/* PHONE B: REALISTIC ANDROID SMARTPHONE HARDWARE CHASSIS */}
               <div className="lg:col-span-5 relative">
-                {/* Hardware Volume & Power Buttons */}
+                {/* External Hardware Buttons */}
                 <div className="absolute -left-[5px] top-24 w-[5px] h-12 bg-slate-700/80 rounded-l-md border-l border-slate-600 shadow-md" />
                 <div className="absolute -left-[5px] top-40 w-[5px] h-12 bg-slate-700/80 rounded-l-md border-l border-slate-600 shadow-md" />
                 <div className="absolute -right-[5px] top-28 w-[5px] h-14 bg-slate-700/80 rounded-r-md border-r border-slate-600 shadow-md" />
 
-                {/* Outer Phone Bezel & Metallic Chassis */}
-                <div className={`rounded-[48px] p-3 border-4 transition-all relative overflow-hidden group ${
+                {/* Outer Phone Bezel & Metallic Frame */}
+                <div className={`rounded-[52px] p-3.5 border-4 transition-all relative overflow-hidden group ${
                   isAlertActive ? 'bg-slate-900 border-rose-500/80 ring-2 ring-rose-500/50 shadow-rose-500/20' : 'bg-slate-900 border-slate-800 ring-1 ring-slate-700/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)]'
                 }`}>
                   <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
                   {/* Inner Screen Surface */}
-                  <div className="bg-slate-950 rounded-[38px] p-4 space-y-4 border border-slate-800/80 min-h-[660px] flex flex-col justify-between">
-                    {/* Top Camera Punch Hole & Android Status Bar */}
+                  <div className="bg-slate-950 rounded-[40px] p-4 space-y-4 border border-slate-800/80 min-h-[670px] flex flex-col justify-between">
+                    {/* Top Punch Hole Camera & Android Status Bar */}
                     <div>
-                      <div className="flex items-center justify-center space-x-2 pb-1.5 border-b border-slate-900">
+                      <div className="flex items-center justify-center space-x-2 pb-1 border-b border-slate-900">
                         <div className="w-12 h-1 bg-slate-800 rounded-full" />
                         <div className="w-3.5 h-3.5 rounded-full bg-slate-950 border border-slate-700 ring-1 ring-emerald-500/30 flex items-center justify-center">
                           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
                         </div>
                       </div>
 
+                      {/* Android System Bar */}
                       <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-1.5 pb-2 border-b border-slate-800/60">
                         <span className="flex items-center gap-1 font-semibold text-emerald-400">
-                          <Smartphone className="w-3 h-3 text-emerald-400" />
-                          iTantra • Android B
+                          <Signal className="w-3 h-3 text-emerald-400" />
+                          iTantra 5G • Android B
                         </span>
-                        <span className="text-[10px] text-slate-400">9:41 AM • 5G 🔋 95%</span>
+                        <span className="flex items-center gap-1 text-[10px] text-slate-400">
+                          <span>9:41 AM</span>
+                          <Battery className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>95%</span>
+                        </span>
                       </div>
                     </div>
 
-                    {/* Main App Content on Android Screen */}
+                    {/* Android App Bar & UI Content */}
                     <div className="space-y-4 flex-1">
-                      {/* Phone Header & Language Selection */}
-                      <div className="flex flex-col space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <span className={`w-2.5 h-2.5 rounded-full ${isAlertActive ? 'bg-rose-500 animate-bounce' : 'bg-emerald-400 animate-pulse'}`} />
-                            <h3 className="font-bold text-slate-100 text-sm">PHONE B (RECEIVER)</h3>
+                      {/* Material App Bar */}
+                      <div className="flex items-center justify-between bg-slate-900/90 p-2.5 rounded-2xl border border-slate-800">
+                        <div className="flex items-center space-x-2">
+                          <ChevronLeft className="w-4 h-4 text-slate-400" />
+                          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                            <Volume2 className="w-4 h-4" />
                           </div>
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800/60">
-                            TTS & TRANSLATOR
-                          </span>
+                          <div>
+                            <h3 className="font-bold text-slate-100 text-xs">iTantra Receiver B</h3>
+                            <span className="text-[9px] text-emerald-400 font-mono block">TTS & Translator • Standby</span>
+                          </div>
                         </div>
+                        <MoreVertical className="w-4 h-4 text-slate-400" />
+                      </div>
 
-                        {/* Phone B Target Language Selector */}
-                        <div className="flex items-center justify-between bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl">
-                          <span className="text-xs text-slate-400 font-mono flex items-center gap-1.5">
-                            <Globe className="w-3.5 h-3.5 text-emerald-400" />
-                            Hear Language:
-                          </span>
-                          <select
-                            value={phoneBLang.code}
-                            onChange={(e) => {
-                              const lang = SUPPORTED_LANGUAGES.find((l) => l.code === e.target.value);
-                              if (lang) setPhoneBLang(lang);
-                            }}
-                            className="bg-slate-950 text-emerald-300 font-bold text-xs rounded-lg px-2 py-1 border border-slate-700"
-                          >
-                            {SUPPORTED_LANGUAGES.map((lang) => (
-                              <option key={lang.code} value={lang.code}>
-                                {lang.displayName} ({lang.nativeName})
-                              </option>
-                            ))}
-                          </select>
+                      {/* Material Target Language Selector Chips */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-slate-400 uppercase flex items-center justify-between px-1">
+                          <span>Target Hear Language:</span>
+                          <span className="text-emerald-400 font-bold">{phoneBLang.nativeName}</span>
+                        </label>
+                        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1">
+                          {SUPPORTED_LANGUAGES.map((lang) => (
+                            <button
+                              key={lang.code}
+                              onClick={() => setPhoneBLang(lang)}
+                              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all ${
+                                phoneBLang.code === lang.code
+                                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                              }`}
+                            >
+                              {lang.displayName}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
                       {/* Emergency Alert Mode Banner if Active */}
                       {isAlertActive && (
-                        <div className="bg-rose-950/90 border-2 border-rose-500 rounded-2xl p-4 text-rose-200 animate-pulse space-y-1 text-center shadow-lg shadow-rose-500/30">
-                          <div className="flex items-center justify-center space-x-2 text-rose-400 font-bold text-sm">
-                            <AlertTriangle className="w-5 h-5" />
+                        <div className="bg-rose-950/90 border-2 border-rose-500 rounded-2xl p-3 text-rose-200 animate-pulse space-y-1 text-center shadow-lg shadow-rose-500/30">
+                          <div className="flex items-center justify-center space-x-2 text-rose-400 font-bold text-xs">
+                            <AlertTriangle className="w-4 h-4" />
                             <span>🚨 CRITICAL EMERGENCY ALERT</span>
                           </div>
-                          <p className="text-xs font-mono text-rose-300">PRIORITY: HIGH VOLUME NON-INTERRUPTIBLE PLAYBACK</p>
+                          <p className="text-[10px] font-mono text-rose-300">HIGH VOLUME NON-INTERRUPTIBLE AUDIO</p>
                         </div>
                       )}
 
-                      {/* Receiver Status & Audio Playback Indicator */}
-                      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 text-center space-y-3">
-                        <div className="text-xs font-mono text-slate-400">
+                      {/* Android Media Player Widget */}
+                      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 text-center space-y-3">
+                        <div className="text-[11px] font-mono text-slate-400">
                           Status: <span className="text-emerald-400 font-semibold">{phoneBStatusText}</span>
                         </div>
 
-                        {/* Speaker Waveform */}
-                        <div className="h-12 bg-slate-950/90 rounded-xl border border-slate-800 flex items-center justify-center space-x-1 px-4 overflow-hidden">
+                        {/* Speaker Sound Waveform */}
+                        <div className="h-10 bg-slate-950/90 rounded-2xl border border-slate-800 flex items-center justify-center space-x-1 px-4 overflow-hidden">
                           {[30, 60, 45, 80, 100, 60, 90, 40, 70, 85, 50, 95, 30].map((h, idx) => (
                             <div
                               key={idx}
@@ -792,59 +822,57 @@ export function ITantraDashboard() {
                           ))}
                         </div>
 
-                        {/* Audio Output Status Button */}
-                        <div className={`w-full py-3 rounded-2xl font-bold text-sm flex items-center justify-center space-x-2 border transition-all ${
+                        {/* Audio Output Status Indicator */}
+                        <div className={`w-full py-3 rounded-2xl font-bold text-xs flex items-center justify-center space-x-2 border transition-all ${
                           isPhoneBPlayingAudio
                             ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20'
                             : 'bg-slate-950 text-slate-400 border-slate-800'
                         }`}>
-                          {isPhoneBPlayingAudio ? <Volume2 className="w-5 h-5 animate-bounce" /> : <VolumeX className="w-5 h-5" />}
-                          <span>{isPhoneBPlayingAudio ? `PLAYING ${phoneBLang.displayName.toUpperCase()} TTS AUDIO...` : 'AUDIO SPEAKER STANDBY'}</span>
+                          {isPhoneBPlayingAudio ? <Volume2 className="w-4 h-4 animate-bounce" /> : <VolumeX className="w-4 h-4" />}
+                          <span>{isPhoneBPlayingAudio ? `PLAYING ${phoneBLang.displayName.toUpperCase()} TTS...` : 'SPEAKER STANDBY'}</span>
                         </div>
                       </div>
 
-                      {/* Cross-Language Translation Output Display */}
-                      <div className="space-y-2">
+                      {/* Android Chat Bubbles */}
+                      <div className="space-y-2 text-xs">
+                        {/* Received Speech Bubble */}
                         <div className="space-y-1">
-                          <label className="text-[11px] font-mono text-slate-400 flex items-center justify-between">
-                            <span>Original Received Text ({phoneALang.displayName}):</span>
-                          </label>
-                          <div className="bg-slate-900/80 border border-slate-800/80 rounded-xl p-2.5 text-xs font-mono text-slate-400 min-h-[40px] flex items-center">
+                          <span className="text-[10px] font-mono text-slate-400 px-1">Received ({phoneALang.displayName}):</span>
+                          <div className="bg-slate-900 border border-slate-800 rounded-2xl rounded-tl-none p-2.5 text-slate-300 font-mono min-h-[40px] flex items-center">
                             {phoneBOriginalText ? `"${phoneBOriginalText}"` : <span className="italic text-slate-600">Waiting for packet...</span>}
                           </div>
                         </div>
 
+                        {/* Translated Speech Bubble */}
                         <div className="space-y-1">
-                          <label className="text-xs font-mono text-emerald-400 font-semibold flex items-center justify-between">
-                            <span>Translated Text ({phoneBLang.displayName}):</span>
-                            <span>{phoneBLang.nativeName}</span>
-                          </label>
-                          <div className="bg-emerald-950/30 border border-emerald-800/50 rounded-xl p-3 text-sm font-semibold text-emerald-200 min-h-[50px] flex items-center">
+                          <span className="text-[10px] font-mono text-emerald-400 font-semibold px-1">Translated ({phoneBLang.displayName}):</span>
+                          <div className="bg-emerald-950/70 border border-emerald-800/60 rounded-2xl rounded-tr-none p-3 text-emerald-200 font-semibold min-h-[50px] flex items-center">
                             {phoneBTranslatedText ? `"${phoneBTranslatedText}"` : <span className="italic text-slate-500 font-normal">Translated text will appear here</span>}
                           </div>
                         </div>
                       </div>
 
-                      {/* TTS & Translation Latency Display */}
-                      <div className="bg-emerald-950/40 border border-emerald-800/40 rounded-xl p-3 space-y-2 text-xs font-mono">
+                      {/* Android NMT & TTS Telemetry Widget */}
+                      <div className="bg-emerald-950/40 border border-emerald-800/40 rounded-2xl p-3 space-y-1.5 text-[11px] font-mono">
                         <div className="flex items-center justify-between text-emerald-300 font-semibold">
-                          <span>NMT TRANSLATION & TTS METRICS</span>
+                          <span>NMT & TTS ENGINE</span>
                           <span className="bg-emerald-900/80 px-2 py-0.5 rounded text-emerald-200 border border-emerald-700">
                             RTF: {realTimeFactor}x
                           </span>
                         </div>
-
-                        <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-300">
-                          <div>NMT Latency: <span className="text-emerald-400 font-bold">{nmtLatencyMs} ms</span></div>
-                          <div>TTS Latency: <span className="text-emerald-400 font-bold">{ttsLatencyMs} ms</span></div>
-                          <div>Audio Duration: <span className="text-emerald-400 font-bold">{audioDurationSec} s</span></div>
+                        <div className="grid grid-cols-3 gap-1 text-[10px] text-slate-300">
+                          <div>NMT: <span className="text-emerald-400 font-bold">{nmtLatencyMs}ms</span></div>
+                          <div>TTS: <span className="text-emerald-400 font-bold">{ttsLatencyMs}ms</span></div>
+                          <div>Duration: <span className="text-emerald-400 font-bold">{audioDurationSec}s</span></div>
                         </div>
                       </div>
                     </div>
 
                     {/* Bottom Android Gesture Navigation Bar */}
-                    <div className="pt-2 border-t border-slate-900 flex flex-col items-center justify-center">
-                      <div className="w-32 h-1 bg-slate-600/80 rounded-full" />
+                    <div className="pt-2 border-t border-slate-900 flex justify-between items-center px-8 text-slate-600 text-xs">
+                      <span>◄</span>
+                      <span className="w-3 h-3 rounded-full border-2 border-slate-600" />
+                      <span>■</span>
                     </div>
                   </div>
                 </div>
