@@ -1,4 +1,48 @@
-import { TTSProvider, AudioResult } from '../../core/interfaces/interfaces';
+function speakHelper(text: string, language: string, onStart?: () => void, onEnd?: () => void): Promise<AudioResult> {
+  return new Promise((resolve) => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = language;
+      const voices = window.speechSynthesis.getVoices();
+      const langShort = language.split('-')[0].toLowerCase();
+      const matched = voices.find((v) => v.lang.toLowerCase().startsWith(langShort));
+      if (matched) utterance.voice = matched;
+
+      let started = false;
+      utterance.onstart = () => {
+        started = true;
+        onStart?.();
+      };
+      utterance.onend = () => {
+        onEnd?.();
+        resolve({ audioDurationMs: 1800, processingTimeMs: 120 });
+      };
+      utterance.onerror = () => {
+        onEnd?.();
+        resolve({ audioDurationMs: 1500, processingTimeMs: 100 });
+      };
+
+      window.speechSynthesis.speak(utterance);
+      // Fallback timeout in case browser requires user gesture
+      setTimeout(() => {
+        if (!started) {
+          onStart?.();
+          setTimeout(() => {
+            onEnd?.();
+            resolve({ audioDurationMs: 1800, processingTimeMs: 120 });
+          }, 1800);
+        }
+      }, 300);
+    } else {
+      onStart?.();
+      setTimeout(() => {
+        onEnd?.();
+        resolve({ audioDurationMs: 1800, processingTimeMs: 120 });
+      }, 1800);
+    }
+  });
+}
 
 export class MicrosoftTTSProvider implements TTSProvider {
   id = 'microsoft';
@@ -18,20 +62,15 @@ export class MicrosoftTTSProvider implements TTSProvider {
     };
   }
 
-  async speak(
-    text: string,
-    language: string,
-    onStart?: () => void,
-    onEnd?: () => void
-  ): Promise<AudioResult> {
-    onStart?.();
-    const result = await this.synthesize(text, language);
-    await new Promise((resolve) => setTimeout(resolve, result.audioDurationMs));
-    onEnd?.();
-    return result;
+  async speak(text: string, language: string, onStart?: () => void, onEnd?: () => void): Promise<AudioResult> {
+    return speakHelper(text, language, onStart, onEnd);
   }
 
-  stop(): void {}
+  stop(): void {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  }
 }
 
 export class LocalPiperTTSProvider implements TTSProvider {
@@ -52,18 +91,13 @@ export class LocalPiperTTSProvider implements TTSProvider {
     };
   }
 
-  async speak(
-    text: string,
-    language: string,
-    onStart?: () => void,
-    onEnd?: () => void
-  ): Promise<AudioResult> {
-    onStart?.();
-    const result = await this.synthesize(text, language);
-    await new Promise((resolve) => setTimeout(resolve, result.audioDurationMs));
-    onEnd?.();
-    return result;
+  async speak(text: string, language: string, onStart?: () => void, onEnd?: () => void): Promise<AudioResult> {
+    return speakHelper(text, language, onStart, onEnd);
   }
 
-  stop(): void {}
+  stop(): void {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  }
 }

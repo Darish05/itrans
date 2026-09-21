@@ -42,6 +42,13 @@ export class WebSpeechTTSProvider implements TTSProvider {
       utterance.rate = 0.95;
       utterance.pitch = 1.0;
 
+      const voices = window.speechSynthesis.getVoices();
+      const langShort = language.split('-')[0].toLowerCase();
+      const matchedVoice = voices.find((v) => v.lang.toLowerCase().startsWith(langShort));
+      if (matchedVoice) {
+        utterance.voice = matchedVoice;
+      }
+
       const startTime = performance.now();
       let playStartTime = 0;
 
