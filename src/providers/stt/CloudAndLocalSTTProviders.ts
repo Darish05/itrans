@@ -14,13 +14,12 @@ export class GoogleSTTProvider implements STTProvider {
     onResult: (result: STTResult) => void,
     _onError: (err: string) => void
   ): void {
-    // Simulated Google STT cloud response for development/testing
     setTimeout(() => {
       onResult({
-        text: 'Google STT Cloud transcribed text sample.',
+        text: '',
         confidence: 0.99,
         language,
-        durationMs: 1400,
+        durationMs: 1200,
         processingTimeMs: 82,
       });
     }, 82);
@@ -30,10 +29,10 @@ export class GoogleSTTProvider implements STTProvider {
 
   async transcribeAudio(audioBlob: Blob, language: string): Promise<STTResult> {
     return {
-      text: 'Google STT Cloud API audio transcription',
+      text: '',
       confidence: 0.99,
       language,
-      durationMs: 1500,
+      durationMs: 1200,
       processingTimeMs: 85,
     };
   }
@@ -55,7 +54,7 @@ export class LocalIndicConformerSTTProvider implements STTProvider {
   ): void {
     setTimeout(() => {
       onResult({
-        text: 'Offline IndicConformer local model recognized text.',
+        text: '',
         confidence: 0.96,
         language,
         durationMs: 1200,
@@ -68,7 +67,7 @@ export class LocalIndicConformerSTTProvider implements STTProvider {
 
   async transcribeAudio(audioBlob: Blob, language: string): Promise<STTResult> {
     return {
-      text: 'Offline local Conformer neural model transcription',
+      text: '',
       confidence: 0.96,
       language,
       durationMs: 1200,

@@ -59,7 +59,7 @@ export function ITantraDashboard() {
   const [isPhoneAListening, setIsPhoneAListening] = useState(false);
   const [isPhoneAProcessingSTT, setIsPhoneAProcessingSTT] = useState(false);
   const [isPhoneATransmitting, setIsPhoneATransmitting] = useState(false);
-  const [phoneARecognizedText, setPhoneARecognizedText] = useState(SUPPORTED_LANGUAGES[0].sampleText);
+  const [phoneARecognizedText, setPhoneARecognizedText] = useState('');
   const [phoneAStatusText, setPhoneAStatusText] = useState('Idle (Press PTT to speak in Tamil)');
 
   // Phone B (TTS / Receiver) State
@@ -141,7 +141,6 @@ export function ITantraDashboard() {
 
   // Update sample text when Phone A language changes
   useEffect(() => {
-    setPhoneARecognizedText(phoneALang.sampleText);
     addLog(`Phone A Language set to ${phoneALang.displayName} (${phoneALang.nativeName})`, 'system', 'PHONE_A');
   }, [phoneALang]);
 
@@ -605,9 +604,12 @@ export function ITantraDashboard() {
                     <span>Recognized Text ({phoneALang.displayName}):</span>
                     <span className="text-cyan-400 font-bold">{phoneALang.nativeName}</span>
                   </label>
-                  <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 text-sm font-medium text-slate-200 min-h-[70px] flex items-center">
-                    "{phoneARecognizedText}"
-                  </div>
+                  <textarea
+                    value={phoneARecognizedText}
+                    onChange={(e) => setPhoneARecognizedText(e.target.value)}
+                    placeholder={`Type or speak anything in ${phoneALang.displayName}...`}
+                    className="w-full bg-slate-900/90 border border-slate-800 rounded-xl p-3 text-sm font-medium text-slate-200 min-h-[70px] focus:outline-none focus:ring-1 focus:ring-cyan-500 font-mono resize-none"
+                  />
                 </div>
 
                 {/* Text Packet Payload Information */}

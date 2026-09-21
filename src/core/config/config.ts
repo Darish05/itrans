@@ -7,7 +7,7 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     nativeName: 'தமிழ்',
     sttSupport: true,
     ttsSupport: true,
-    sampleText: 'வணக்கம், இது அவசர தகவல்.',
+    sampleText: '',
   },
   {
     code: 'hi-IN',
@@ -15,7 +15,7 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     nativeName: 'हिन्दी',
     sttSupport: true,
     ttsSupport: true,
-    sampleText: 'आपातकालीन सहायता आवश्यक है।',
+    sampleText: '',
   },
   {
     code: 'en-IN',
@@ -23,7 +23,7 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     nativeName: 'English (India)',
     sttSupport: true,
     ttsSupport: true,
-    sampleText: 'Emergency assistance required immediately.',
+    sampleText: '',
   },
   {
     code: 'te-IN',
@@ -31,7 +31,7 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     nativeName: 'తెలుగు',
     sttSupport: true,
     ttsSupport: true,
-    sampleText: 'అత్యవసర సహాయం అవసరం.',
+    sampleText: '',
   },
   {
     code: 'kn-IN',
@@ -39,7 +39,7 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     nativeName: 'ಕನ್ನಡ',
     sttSupport: true,
     ttsSupport: true,
-    sampleText: 'ತುರ್ತು ನೆರವು ಅಗತ್ಯವಿದೆ.',
+    sampleText: '',
   },
   {
     code: 'ml-IN',
@@ -47,7 +47,7 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     nativeName: 'മലയാളം',
     sttSupport: true,
     ttsSupport: true,
-    sampleText: 'അടിയന്തര സഹായം ആവശ്യമാണ്.',
+    sampleText: '',
   },
   {
     code: 'mr-IN',
@@ -55,7 +55,7 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     nativeName: 'मराठी',
     sttSupport: true,
     ttsSupport: true,
-    sampleText: 'तातडीची मदत आवश्यक आहे.',
+    sampleText: '',
   },
   {
     code: 'gu-IN',
@@ -63,7 +63,7 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     nativeName: 'ગુજરાતી',
     sttSupport: true,
     ttsSupport: true,
-    sampleText: 'તાકીદની સહાયની જરૂર છે.',
+    sampleText: '',
   },
   {
     code: 'bn-IN',
@@ -71,7 +71,7 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     nativeName: 'বাংলা',
     sttSupport: true,
     ttsSupport: true,
-    sampleText: 'জরুরী সহায়তা প্রয়োজন।',
+    sampleText: '',
   },
   {
     code: 'or-IN',
@@ -79,7 +79,7 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
     nativeName: 'ଓଡ଼ିଆ',
     sttSupport: true,
     ttsSupport: true,
-    sampleText: 'ଜରୁରୀ ସହାୟତା ଆବଶ୍ୟକ।',
+    sampleText: '',
   },
 ];
 
