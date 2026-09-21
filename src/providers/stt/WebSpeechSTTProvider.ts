@@ -23,7 +23,8 @@ export class WebSpeechSTTProvider implements STTProvider {
   startListening(
     language: string,
     onResult: (result: STTResult) => void,
-    onError: (err: string) => void
+    onError: (err: string) => void,
+    onEnd?: () => void
   ): void {
     if (!this.isSupported()) {
       onError('Browser Speech Recognition is not supported on this device/browser.');
@@ -59,6 +60,11 @@ export class WebSpeechSTTProvider implements STTProvider {
 
       this.recognition.onerror = (event: any) => {
         onError(`STT Error: ${event.error}`);
+      };
+
+      this.recognition.onend = () => {
+        this.recognition = null;
+        onEnd?.();
       };
 
       this.recognition.start();

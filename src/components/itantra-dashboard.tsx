@@ -163,20 +163,24 @@ export function ITantraDashboard() {
   // Toggle live continuous microphone speech recognition
   const toggleMicListening = () => {
     if (isPhoneAListening) {
-      // Stop listening and keep captured multi-word sentence
+      // Stop listening and AUTOMATICALLY transmit + translate
       if (sttProviderRef.current?.stopListening) {
         sttProviderRef.current.stopListening();
       }
       setIsPhoneAListening(false);
       setWaveAnim(false);
-      setPhoneAStatusText('Speech Recorded • Click TRANSMIT 42B');
-      addLog(`Mic stopped. Captured text: "${phoneARecognizedText}"`, 'stt', 'PHONE_A');
+      addLog(`Mic stopped on Phone A. Auto-transmitting speech packet...`, 'stt', 'PHONE_A');
+      
+      // Auto-transmit immediately on mic stop!
+      setTimeout(() => {
+        handleTransmitSpeech();
+      }, 50);
     } else {
       // Start continuous multi-word listening
       setIsPhoneAListening(true);
       setWaveAnim(true);
-      setPhoneAStatusText(`Listening continuously in ${phoneALang.displayName}...`);
-      addLog(`Microphone active on Phone A (${phoneALang.displayName}). Speak full sentence...`, 'stt', 'PHONE_A');
+      setPhoneAStatusText(`Listening in ${phoneALang.displayName}... Tap again to send & translate`);
+      addLog(`Microphone active on Phone A (${phoneALang.displayName}). Speak your sentence...`, 'stt', 'PHONE_A');
 
       if (sttProviderType === 'web_speech' && sttProviderRef.current.isSupported()) {
         try {
@@ -190,10 +194,37 @@ export function ITantraDashboard() {
             (err: string) => {
               console.warn(err);
               setPhoneAStatusText(`STT Warning: ${err}`);
+            },
+            () => {
+              // On speech end / silence boundary -> auto transmit & translate!
+              if (isPhoneAListening) {
+                setIsPhoneAListening(false);
+                setWaveAnim(false);
+                addLog('VAD Silence boundary detected. Auto-transmitting packet...', 'stt', 'PHONE_A');
+                handleTransmitSpeech();
+              }
             }
           );
         } catch (e: any) {
           console.warn('STT Error', e);
+        }
+      } else {
+        // For Google / Indic Conformer adapters, auto-record and transmit
+        if (sttProviderRef.current?.startListening) {
+          sttProviderRef.current.startListening(
+            phoneALang.code,
+            (res: any) => {
+              if (res.text) {
+                setPhoneARecognizedText(res.text);
+                setTimeout(() => {
+                  setIsPhoneAListening(false);
+                  setWaveAnim(false);
+                  handleTransmitSpeech(res.text);
+                }, 600);
+              }
+            },
+            (err: string) => console.warn(err)
+          );
         }
       }
     }
@@ -669,7 +700,7 @@ export function ITantraDashboard() {
                           >
                             <Mic className="w-8 h-8 fill-current" />
                             <span className="text-[10px] font-extrabold uppercase tracking-tighter">
-                              {isPhoneAListening ? 'STOP & SAVE' : 'START MIC'}
+                              {isPhoneAListening ? 'TAP TO SEND' : 'TAP TO SPEAK'}
                             </span>
                           </button>
                         </div>
